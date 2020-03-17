@@ -40,7 +40,7 @@ class VCard implements ProtocolImplementationInterface
 
     protected $image;
 
-    protected $ulr;
+    protected $url;
 
     /**
      * Constructor.
@@ -61,6 +61,11 @@ class VCard implements ProtocolImplementationInterface
      */
     public function toString()
     {
+        if ($this->getImage()){
+            $photo = XML::quoteMessage('<PHOTO><TYPE>%s</TYPE><BINVAL>%s</BINVAL></PHOTO>', $this->getMime(), $this->getImage());
+        } else {
+            $photo = '';
+        }
 
          return XML::quoteMessage(
             '<iq id="' . XML::generateId() . '" type="set">
@@ -73,12 +78,7 @@ class VCard implements ProtocolImplementationInterface
                 </N>
                 <NICKNAME>%s</NICKNAME>
                 <URL>%s</URL>
-                <PHOTO>
-                  <TYPE>%s</TYPE>
-                  <BINVAL>
-                    %s
-                  </BINVAL>
-                </PHOTO>
+                '.$photo.'
                 <JABBERID>%s</JABBERID>
                 <DESC/>
               </vCard>
@@ -88,8 +88,6 @@ class VCard implements ProtocolImplementationInterface
             $this->getFirstname(),
             $this->getFirstname().' '.$this->getLastname(),
             $this->getUrl(),
-            $this->getMime(),
-            $this->getImage(),
             $this->getJabberID()
         );
     }
