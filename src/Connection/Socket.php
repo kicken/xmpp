@@ -36,26 +36,25 @@
 
 namespace Fabiang\Xmpp\Connection;
 
-use Psr\Log\LogLevel;
+use Fabiang\Xmpp\Exception\TimeoutException;
+use Fabiang\Xmpp\Options;
 use Fabiang\Xmpp\Stream\SocketClient;
 use Fabiang\Xmpp\Util\XML;
-use Fabiang\Xmpp\Options;
-use Fabiang\Xmpp\Exception\TimeoutException;
+use Psr\Log\LogLevel;
 
 /**
  * Connection to a socket stream.
  *
  * @package Xmpp\Connection
  */
-class Socket extends AbstractConnection implements SocketConnectionInterface
-{
+class Socket extends AbstractConnection implements SocketConnectionInterface {
 
     const DEFAULT_LENGTH = 4096;
-    const STREAM_START   = <<<'XML'
+    const STREAM_START = <<<'XML'
 <?xml version="1.0" encoding="UTF-8"?>
 <stream:stream to="%s" xmlns:stream="http://etherx.jabber.org/streams" xmlns="jabber:client" version="1.0">
 XML;
-    const STREAM_END     = '</stream:stream>';
+    const STREAM_END = '</stream:stream>';
 
     /**
      * Socket.
@@ -74,10 +73,9 @@ XML;
     /**
      * Constructor set default socket instance if no socket was given.
      *
-     * @param StreamSocket $socket  Socket instance
+     * @param StreamSocket $socket Socket instance
      */
-    public function __construct(SocketClient $socket)
-    {
+    public function __construct(SocketClient $socket){
         $this->setSocket($socket);
     }
 
@@ -85,34 +83,35 @@ XML;
      * Factory for connection class.
      *
      * @param Options $options Options object
+     *
      * @return static
      */
-    public static function factory(Options $options)
-    {
+    public static function factory(Options $options){
         $socket = new SocketClient($options->getAddress(), $options->getContextOptions());
         $object = new static($socket);
         $object->setOptions($options);
+
         return $object;
     }
 
     /**
      * {@inheritDoc}
      */
-    public function receive()
-    {
+    public function receive(){
         $buffer = $this->getSocket()->read(static::DEFAULT_LENGTH);
 
-        if ($buffer) {
+        if ($buffer){
             $this->receivedAnyData = true;
             $address = $this->getAddress();
             $this->log("Received buffer '$buffer' from '{$address}'", LogLevel::DEBUG);
             $this->getInputStream()->parse($buffer);
+
             return $buffer;
         }
 
         try {
             $this->checkTimeout($buffer);
-        } catch (TimeoutException $exception) {
+        } catch (TimeoutException $exception){
             $this->reconnectTls($exception);
         }
     }
@@ -121,25 +120,26 @@ XML;
      * Try to reconnect via TLS.
      *
      * @param TimeoutException $exception
+     *
      * @return null
      * @throws TimeoutException
      */
-    private function reconnectTls(TimeoutException $exception)
-    {
+    private function reconnectTls(TimeoutException $exception){
         // check if we didn't receive any data
         // if not we re-try to connect via TLS
-        if (false === $this->receivedAnyData) {
+        if (false === $this->receivedAnyData){
             $matches = [];
             $previousAddress = $this->getOptions()->getAddress();
             // only reconnect via tls if we've used tcp before.
-            if (preg_match('#tcp://(?<address>.+)#', $previousAddress, $matches)) {
+            if (preg_match('#tcp://(?<address>.+)#', $previousAddress, $matches)){
                 $this->log('Connecting via TCP failed, now trying to connect via TLS');
 
                 $address = 'tls://' . $matches['address'];
                 $this->connected = false;
                 $this->getOptions()->setAddress($address);
-                $this->getSocket()->reconnect($address);
+                $this->getSocket()->reconnect($address, $this->getOptions()->getTimeout());
                 $this->connect();
+
                 return;
             }
         }
@@ -150,9 +150,8 @@ XML;
     /**
      * {@inheritDoc}
      */
-    public function send($buffer)
-    {
-        if (false === $this->isConnected()) {
+    public function send($buffer){
+        if (false === $this->isConnected()){
             $this->connect();
         }
 
@@ -161,7 +160,7 @@ XML;
         $this->getSocket()->write($buffer);
         $this->getOutputStream()->parse($buffer);
 
-        while ($this->checkBlockingListeners()) {
+        while ($this->checkBlockingListeners()){
             $this->receive();
         }
     }
@@ -169,9 +168,8 @@ XML;
     /**
      * {@inheritDoc}
      */
-    public function connect()
-    {
-        if (false === $this->connected) {
+    public function connect(){
+        if (false === $this->connected){
             $address = $this->getAddress();
             $this->getSocket()->connect($this->getOptions()->getTimeout());
             $this->getSocket()->setBlocking(true);
@@ -186,10 +184,9 @@ XML;
     /**
      * {@inheritDoc}
      */
-    public function disconnect()
-    {
-        if (true === $this->connected) {
-            $address         = $this->getAddress();
+    public function disconnect(){
+        if (true === $this->connected){
+            $address = $this->getAddress();
             $this->send(static::STREAM_END);
             $this->getSocket()->close();
             $this->connected = false;
@@ -202,8 +199,7 @@ XML;
      *
      * @return string
      */
-    protected function getAddress()
-    {
+    protected function getAddress(){
         return $this->getOptions()->getAddress();
     }
 
@@ -212,17 +208,16 @@ XML;
      *
      * @return SocketClient
      */
-    public function getSocket()
-    {
+    public function getSocket(){
         return $this->socket;
     }
 
     /**
      * {@inheritDoc}
      */
-    public function setSocket(SocketClient $socket)
-    {
+    public function setSocket(SocketClient $socket){
         $this->socket = $socket;
+
         return $this;
     }
 }
